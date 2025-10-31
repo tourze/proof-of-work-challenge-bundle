@@ -1,0 +1,48 @@
+services:
+  # default configuration for services in *this* file
+  _defaults:
+    autowire: true      # Automatically injects dependencies in your services.
+    autoconfigure: true # Automatically registers your services as commands, event subscribers, etc.
+    public: false
+
+  # Storage Services
+  Tourze\ProofOfWorkChallengeBundle\Storage\CacheChallengeStorage:
+    arguments:
+      $cache: '@cache.app'
+      $prefix: 'pow_challenge_'
+
+  Tourze\ProofOfWorkChallengeBundle\Storage\ChallengeStorageInterface: '@Tourze\ProofOfWorkChallengeBundle\Storage\CacheChallengeStorage'
+
+  # Generator Services  
+  Tourze\ProofOfWorkChallengeBundle\Service\HashcashChallengeGenerator:
+    arguments:
+      $defaultTimeLimit: 300
+
+  Tourze\ProofOfWorkChallengeBundle\Service\ChallengeGeneratorInterface: '@Tourze\ProofOfWorkChallengeBundle\Service\HashcashChallengeGenerator'
+
+  # Verifier Services
+  Tourze\ProofOfWorkChallengeBundle\Service\HashcashProofVerifier: ~
+
+  Tourze\ProofOfWorkChallengeBundle\Service\ProofVerifierInterface: '@Tourze\ProofOfWorkChallengeBundle\Service\HashcashProofVerifier'
+
+  # Adjuster Services
+  Tourze\ProofOfWorkChallengeBundle\Service\AdaptiveDifficultyAdjuster:
+    arguments:
+      $storage: '@Tourze\ProofOfWorkChallengeBundle\Storage\ChallengeStorageInterface'
+      $baseDifficulty: 4
+      $maxDifficulty: 20
+
+  Tourze\ProofOfWorkChallengeBundle\Service\DifficultyAdjusterInterface: '@Tourze\ProofOfWorkChallengeBundle\Service\AdaptiveDifficultyAdjuster'
+
+  # Procedure Handlers
+  Tourze\ProofOfWorkChallengeBundle\Procedure\IssueChallengeHandler: ~
+  Tourze\ProofOfWorkChallengeBundle\Procedure\VerifyChallengeHandler: ~
+
+  # Admin Services
+  Tourze\ProofOfWorkChallengeBundle\Service\AdminMenu: ~
+  
+  # Admin Controllers
+  Tourze\ProofOfWorkChallengeBundle\Controller\Admin\ChallengeCrudController:
+    arguments:
+      $challengeStorage: '@Tourze\ProofOfWorkChallengeBundle\Storage\CacheChallengeStorage'
+    tags: ['controller.service_arguments']

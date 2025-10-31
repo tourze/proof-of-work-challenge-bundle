@@ -1,0 +1,228 @@
+{% extends "base.html.twig" %}
+
+{% block title %}工作证明挑战管理{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+{% endblock %}
+
+{% block body %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">
+                        <i class="bi bi-shield-lock"></i>
+                        工作证明挑战管理
+                    </h4>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-primary" onclick="refreshList()">
+                            <i class="bi bi-arrow-clockwise"></i> 刷新
+                        </button>
+                        <button class="btn btn-outline-danger" onclick="cleanupExpired()">
+                            <i class="bi bi-trash"></i> 清理过期
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if challenges is empty %}
+                        <div class="text-center py-5">
+                            <i class="bi bi-inbox display-1 text-muted"></i>
+                            <h5 class="text-muted mt-3">暂无挑战数据</h5>
+                            <p class="text-muted">当前没有有效的工作证明挑战</p>
+                        </div>
+                    {% else %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th width="15%">挑战ID</th>
+                                        <th width="10%">类型</th>
+                                        <th width="8%">难度</th>
+                                        <th width="12%">状态</th>
+                                        <th width="12%">剩余时间</th>
+                                        <th width="12%">创建时间</th>
+                                        <th width="12%">客户端ID</th>
+                                        <th width="12%">资源</th>
+                                        <th width="7%">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for challenge in challenges %}
+                                        <tr>
+                                            <td>
+                                                <code class="text-primary">{{ challenge.id[:12] }}...</code>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-info">{{ challenge.type }}</span>
+                                            </td>
+                                            <td>
+                                                <span class="badge {% if challenge.difficulty >= 20 %}bg-danger{% elseif challenge.difficulty >= 15 %}bg-warning{% else %}bg-success{% endif %}">
+                                                    {{ challenge.difficulty }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                {% if challenge.used %}
+                                                    <span class="badge bg-secondary">
+                                                        <i class="bi bi-check-circle"></i> 已使用
+                                                    </span>
+                                                {% elseif challenge.expired %}
+                                                    <span class="badge bg-danger">
+                                                        <i class="bi bi-clock-history"></i> 已过期
+                                                    </span>
+                                                {% else %}
+                                                    <span class="badge bg-success">
+                                                        <i class="bi bi-shield-check"></i> 有效
+                                                    </span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if challenge.expired %}
+                                                    <span class="text-danger">已过期</span>
+                                                {% else %}
+                                                    {% set remaining = challenge.expireTime - 'now'|date('U') %}
+                                                    {% set minutes = (remaining / 60)|round(0, 'floor') %}
+                                                    {% set seconds = remaining % 60 %}
+                                                    <span class="text-warning">{{ minutes }}分{{ seconds }}秒</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <small>{{ challenge.createTime|date('Y-m-d H:i:s') }}</small>
+                                            </td>
+                                            <td>
+                                                {% if challenge.clientId %}
+                                                    <code class="text-muted">{{ challenge.clientId[:10] }}...</code>
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if challenge.resource %}
+                                                    <span class="text-info">{{ challenge.resource }}</span>
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    <a href="{{ path('admin_challenge_show', {id: challenge.id}) }}" 
+                                                       class="btn btn-outline-primary" 
+                                                       title="查看详情">
+                                                        <i class="bi bi-eye"></i>
+                                                    </a>
+                                                    <button class="btn btn-outline-danger" 
+                                                            onclick="deleteChallenge('{{ challenge.id }}')" 
+                                                            title="删除">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- 分页 -->
+                        {% if totalPages > 1 %}
+                            <div class="d-flex justify-content-between align-items-center mt-3">
+                                <div class="text-muted">
+                                    共 {{ total }} 条记录，第 {{ page }}/{{ totalPages }} 页
+                                </div>
+                                <nav>
+                                    <ul class="pagination pagination-sm mb-0">
+                                        {% if page > 1 %}
+                                            <li class="page-item">
+                                                <a class="page-link" href="{{ path('admin_challenge_index', {page: page - 1}) }}">
+                                                    <i class="bi bi-chevron-left"></i>
+                                                </a>
+                                            </li>
+                                        {% endif %}
+                                        
+                                        {% for p in 1..totalPages %}
+                                            {% if p == page %}
+                                                <li class="page-item active">
+                                                    <span class="page-link">{{ p }}</span>
+                                                </li>
+                                            {% elseif p >= page - 2 and p <= page + 2 %}
+                                                <li class="page-item">
+                                                    <a class="page-link" href="{{ path('admin_challenge_index', {page: p}) }}">{{ p }}</a>
+                                                </li>
+                                            {% endif %}
+                                        {% endfor %}
+                                        
+                                        {% if page < totalPages %}
+                                            <li class="page-item">
+                                                <a class="page-link" href="{{ path('admin_challenge_index', {page: page + 1}) }}">
+                                                    <i class="bi bi-chevron-right"></i>
+                                                </a>
+                                            </li>
+                                        {% endif %}
+                                    </ul>
+                                </nav>
+                            </div>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 删除确认模态框 -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">确认删除</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>确认要删除此挑战吗？此操作不可撤销。</p>
+                <p class="text-muted">挑战ID: <code id="deleteId"></code></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <form id="deleteForm" method="post" class="d-inline">
+                    <input type="hidden" name="_token" value="{{ csrf_token('delete') }}">
+                    <button type="submit" class="btn btn-danger">删除</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function deleteChallenge(id) {
+            document.getElementById('deleteId').textContent = id;
+            document.getElementById('deleteForm').action = '/admin/challenge/' + id + '/delete';
+            new bootstrap.Modal(document.getElementById('deleteModal')).show();
+        }
+
+        function refreshList() {
+            window.location.reload();
+        }
+
+        function cleanupExpired() {
+            if (confirm('确认要清理所有过期的挑战吗？')) {
+                // TODO: 实现清理过期挑战的功能
+                alert('功能开发中...');
+            }
+        }
+
+        // 自动刷新页面（每30秒）
+        setInterval(function() {
+            const now = new Date();
+            if (now.getSeconds() === 0) { // 每分钟整点刷新
+                window.location.reload();
+            }
+        }, 30000);
+    </script>
+{% endblock %}
