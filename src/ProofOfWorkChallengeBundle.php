@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tourze\ProofOfWorkChallengeBundle;
 
 use Symfony\Component\HttpKernel\Bundle\Bundle;
+use Tourze\EasyAdminMenuBundle\EasyAdminMenuBundle;
 
 class ProofOfWorkChallengeBundle extends Bundle
 {
@@ -13,6 +14,7 @@ class ProofOfWorkChallengeBundle extends Bundle
      */
     public static function getBundleDependencies(): array
     {
-        return ['all' => true];
+        return ['all' => true,
+            EasyAdminMenuBundle::class => ['all' => true],];
     }
 }
