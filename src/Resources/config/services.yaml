@@ -39,8 +39,10 @@ services:
   Tourze\ProofOfWorkChallengeBundle\Procedure\VerifyChallengeHandler: ~
 
   # Admin Services
-  Tourze\ProofOfWorkChallengeBundle\Service\AdminMenu: ~
-  
+  Tourze\ProofOfWorkChallengeBundle\Service\AdminMenu:
+    public: true
+
+    
   # Admin Controllers
   Tourze\ProofOfWorkChallengeBundle\Controller\Admin\ChallengeCrudController:
     arguments:

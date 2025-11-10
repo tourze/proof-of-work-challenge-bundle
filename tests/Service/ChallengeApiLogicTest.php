@@ -124,7 +124,11 @@ final class ChallengeApiLogicTest extends AbstractWebTestCase
         $content = $response->getContent();
         $this->assertIsString($content);
         $data = json_decode($content, true);
+        $this->assertIsArray($data);
+        $this->assertArrayHasKey('total', $data);
+        $this->assertArrayHasKey('data', $data);
         $this->assertEquals(0, $data['total']);
+        $this->assertIsArray($data['data']);
         $this->assertEmpty($data['data']);
     }
 
@@ -148,7 +152,12 @@ final class ChallengeApiLogicTest extends AbstractWebTestCase
         $content = $response->getContent();
         $this->assertIsString($content);
         $data = json_decode($content, true);
+        $this->assertIsArray($data);
+        $this->assertArrayHasKey('data', $data);
+        $this->assertIsArray($data['data']);
+        $this->assertNotEmpty($data['data']);
         $challengeData = $data['data'][0];
+        $this->assertIsArray($challengeData);
 
         $this->assertEquals('已使用', $challengeData['status']);
     }
@@ -176,8 +185,13 @@ final class ChallengeApiLogicTest extends AbstractWebTestCase
         $content = $response->getContent();
         $this->assertIsString($content);
         $data = json_decode($content, true);
+        $this->assertIsArray($data);
+        $this->assertArrayHasKey('data', $data);
+        $this->assertIsArray($data['data']);
+        $this->assertNotEmpty($data['data']);
 
         $challengeData = $data['data'][0];
+        $this->assertIsArray($challengeData);
         $this->assertEquals('有效', $challengeData['status']);
         $this->assertFalse($challengeData['used']);
         $this->assertFalse($challengeData['expired']);
@@ -203,7 +217,14 @@ final class ChallengeApiLogicTest extends AbstractWebTestCase
         $content = $response->getContent();
         $this->assertIsString($content);
         $data = json_decode($content, true);
+        $this->assertIsArray($data);
+        $this->assertArrayHasKey('data', $data);
+        $this->assertIsArray($data['data']);
+        $this->assertNotEmpty($data['data']);
+
         $challengeData = $data['data'][0];
+        $this->assertIsArray($challengeData);
+        $this->assertArrayHasKey('ttl', $challengeData);
 
         $this->assertEquals('30分0秒', $challengeData['ttl']);
     }

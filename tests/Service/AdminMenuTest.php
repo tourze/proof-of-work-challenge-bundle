@@ -28,7 +28,7 @@ final class AdminMenuTest extends AbstractEasyAdminMenuTestCase
     {
         // 模拟依赖服务
         $this->challengeStorage = $this->createMock(CacheChallengeStorage::class);
-        $linkGenerator = $this->createMock(LinkGeneratorInterface::class);
+        $linkGenerator = new TestLinkGenerator();
 
         // 将模拟服务注入容器
         self::getContainer()->set(CacheChallengeStorage::class, $this->challengeStorage);
@@ -60,6 +60,7 @@ final class AdminMenuTest extends AbstractEasyAdminMenuTestCase
         $this->assertArrayHasKey('proof_of_work_challenges', $menuItems);
 
         $challengeMenu = $menuItems['proof_of_work_challenges'];
+        $this->assertIsArray($challengeMenu);
         $this->assertArrayHasKey('label', $challengeMenu);
         $this->assertArrayHasKey('icon', $challengeMenu);
         $this->assertArrayHasKey('route', $challengeMenu);
@@ -100,7 +101,9 @@ final class AdminMenuTest extends AbstractEasyAdminMenuTestCase
         ;
 
         $menuItems = $this->adminMenu->getMenuItems();
-        $this->assertEquals(2, $menuItems['proof_of_work_challenges']['badge']);
+        $challengeMenu = $menuItems['proof_of_work_challenges'];
+        $this->assertIsArray($challengeMenu);
+        $this->assertEquals(2, $challengeMenu['badge']);
     }
 
     public function testGetStatisticsReturnsCorrectCounts(): void
@@ -177,8 +180,10 @@ final class AdminMenuTest extends AbstractEasyAdminMenuTestCase
         ;
 
         $menuItems = $this->adminMenu->getMenuItems();
+        $challengeMenu = $menuItems['proof_of_work_challenges'];
+        $this->assertIsArray($challengeMenu);
 
         // 当存储出错时，徽章应该显示0
-        $this->assertEquals(0, $menuItems['proof_of_work_challenges']['badge']);
+        $this->assertEquals(0, $challengeMenu['badge']);
     }
 }

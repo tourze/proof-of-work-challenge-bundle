@@ -49,7 +49,13 @@ class CacheChallengeStorage implements ChallengeStorageInterface
             return null;
         }
 
-        return $this->hydrate($data);
+        // 确保数组键为字符串类型
+        $stringKeyedData = [];
+        foreach ($data as $key => $value) {
+            $stringKeyedData[(string) $key] = $value;
+        }
+
+        return $this->hydrate($stringKeyedData);
     }
 
     public function markAsUsed(string $id): void
@@ -123,32 +129,90 @@ class CacheChallengeStorage implements ChallengeStorageInterface
      */
     private function hydrate(array $data): Challenge
     {
-        $challenge = new Challenge(
-            $data['id'],
-            $data['type'],
-            $data['challenge'],
-            $data['difficulty'],
-            $data['create_time'],
-            $data['expire_time']
-        );
+        $challenge = $this->createChallengeFromData($data);
+        $this->populateOptionalFields($challenge, $data);
+        $this->markAsUsedIfNeeded($challenge, $data);
 
+        return $challenge;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function createChallengeFromData(array $data): Challenge
+    {
+        $id = isset($data['id']) ? $this->convertToString($data['id']) : '';
+        $type = isset($data['type']) ? $this->convertToString($data['type']) : '';
+        $challenge = isset($data['challenge']) ? $this->convertToString($data['challenge']) : '';
+        $difficulty = isset($data['difficulty']) ? $this->convertToInt($data['difficulty']) : 0;
+        $createTime = isset($data['create_time']) ? $this->convertToInt($data['create_time']) : 0;
+        $expireTime = isset($data['expire_time']) ? $this->convertToInt($data['expire_time']) : 0;
+
+        return new Challenge($id, $type, $challenge, $difficulty, $createTime, $expireTime);
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function populateOptionalFields(Challenge $challenge, array $data): void
+    {
         if (isset($data['resource'])) {
-            $challenge->setResource($data['resource']);
+            $challenge->setResource($this->convertToString($data['resource']));
         }
 
         if (isset($data['client_id'])) {
-            $challenge->setClientId($data['client_id']);
+            $challenge->setClientId($this->convertToString($data['client_id']));
         }
 
         if (isset($data['metadata'])) {
-            $challenge->setMetadata($data['metadata']);
+            $metadata = $data['metadata'];
+            if (is_array($metadata)) {
+                $stringKeyedMetadata = [];
+                foreach ($metadata as $key => $value) {
+                    $stringKeyedMetadata[(string) $key] = $value;
+                }
+                $challenge->setMetadata($stringKeyedMetadata);
+            }
         }
+    }
 
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function markAsUsedIfNeeded(Challenge $challenge, array $data): void
+    {
         if (isset($data['used']) && true === $data['used']) {
             $challenge->markAsUsed();
         }
+    }
 
-        return $challenge;
+    /**
+     * 安全地将 mixed 类型转换为 string
+     */
+    private function convertToString(mixed $value): string
+    {
+        return match (true) {
+            is_string($value) => $value,
+            is_numeric($value) => (string) $value,
+            is_bool($value) => $value ? '1' : '0',
+            null === $value => '',
+            is_object($value) && method_exists($value, '__toString') => (string) $value,
+            default => '',
+        };
+    }
+
+    /**
+     * 安全地将 mixed 类型转换为 int
+     */
+    private function convertToInt(mixed $value): int
+    {
+        return match (true) {
+            is_int($value) => $value,
+            is_string($value) && is_numeric($value) => (int) $value,
+            is_bool($value) => $value ? 1 : 0,
+            is_float($value) => (int) $value,
+            default => 0,
+        };
     }
 
     private function addToClientHistory(string $clientId, string $challengeId): void
@@ -186,7 +250,17 @@ class CacheChallengeStorage implements ChallengeStorageInterface
 
         $index = $item->get();
 
-        return is_array($index) ? $index : [];
+        if (!is_array($index)) {
+            return [];
+        }
+
+        // 确保所有元素都是字符串
+        $stringIndex = [];
+        foreach ($index as $indexItem) {
+            $stringIndex[] = $this->convertToString($indexItem);
+        }
+
+        return $stringIndex;
     }
 
     /**
