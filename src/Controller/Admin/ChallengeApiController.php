@@ -10,7 +10,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Tourze\ProofOfWorkChallengeBundle\Entity\Challenge;
-use Tourze\ProofOfWorkChallengeBundle\Storage\CacheChallengeStorage;
+use Tourze\ProofOfWorkChallengeBundle\Storage\ChallengeStorageInterface;
 
 /**
  * Challenge API控制器
@@ -18,11 +18,11 @@ use Tourze\ProofOfWorkChallengeBundle\Storage\CacheChallengeStorage;
  * 此控制器为基于缓存存储的Challenge实体提供API接口。
  * 由于Challenge不是Doctrine实体，它不使用标准的EasyAdmin CRUD架构。
  */
-final class ChallengeCrudController extends AbstractController
+final class ChallengeApiController extends AbstractController
 {
-    private CacheChallengeStorage $challengeStorage;
+    private ChallengeStorageInterface $challengeStorage;
 
-    public function __construct(CacheChallengeStorage $challengeStorage)
+    public function __construct(ChallengeStorageInterface $challengeStorage)
     {
         $this->challengeStorage = $challengeStorage;
     }

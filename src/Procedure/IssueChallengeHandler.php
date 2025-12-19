@@ -8,7 +8,7 @@ use Tourze\ProofOfWorkChallengeBundle\Service\ChallengeGeneratorInterface;
 use Tourze\ProofOfWorkChallengeBundle\Service\DifficultyAdjusterInterface;
 use Tourze\ProofOfWorkChallengeBundle\Storage\ChallengeStorageInterface;
 
-class IssueChallengeHandler
+final class IssueChallengeHandler
 {
     private ChallengeGeneratorInterface $generator;
 

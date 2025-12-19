@@ -6,7 +6,7 @@ namespace Tourze\ProofOfWorkChallengeBundle\Service;
 
 use Tourze\ProofOfWorkChallengeBundle\Entity\Challenge;
 
-class HashcashChallengeGenerator implements ChallengeGeneratorInterface
+final class HashcashChallengeGenerator implements ChallengeGeneratorInterface
 {
     private int $defaultTimeLimit;
 

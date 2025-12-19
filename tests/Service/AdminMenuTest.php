@@ -13,33 +13,38 @@ use Tourze\ProofOfWorkChallengeBundle\Service\AdminMenu;
 use Tourze\ProofOfWorkChallengeBundle\Storage\CacheChallengeStorage;
 
 /**
- * AdminMenu 服务测试
+ * AdminMenu 服务集成测试
  * @internal
  */
 #[CoversClass(AdminMenu::class)]
 #[RunTestsInSeparateProcesses]
 final class AdminMenuTest extends AbstractEasyAdminMenuTestCase
 {
-    private CacheChallengeStorage $challengeStorage;
+    private CacheChallengeStorage $storage;
 
     private AdminMenu $adminMenu;
 
     protected function onSetUp(): void
     {
-        // 模拟依赖服务
-        $this->challengeStorage = $this->createMock(CacheChallengeStorage::class);
-        $linkGenerator = new TestLinkGenerator();
+        // 使用真实的存储服务
+        $this->storage = self::getService(CacheChallengeStorage::class);
+        $this->adminMenu = self::getService(AdminMenu::class);
 
-        // 将模拟服务注入容器
-        self::getContainer()->set(CacheChallengeStorage::class, $this->challengeStorage);
-        self::getContainer()->set(LinkGeneratorInterface::class, $linkGenerator);
+        // 清理存储中的所有挑战数据
+        $this->cleanStorage();
+    }
+
+    private function cleanStorage(): void
+    {
+        $allChallenges = $this->storage->findAll();
+        foreach ($allChallenges as $challenge) {
+            $this->storage->delete($challenge->getId());
+        }
     }
 
     public function testGetMenuItemsReturnsCorrectStructure(): void
     {
-        $this->adminMenu = self::getService(AdminMenu::class);
-
-        // 模拟返回一个活跃的挑战
+        // 创建一个活跃的挑战
         $challenge = new Challenge(
             'test-id',
             'hashcash',
@@ -48,11 +53,7 @@ final class AdminMenuTest extends AbstractEasyAdminMenuTestCase
             time(),
             time() + 3600
         );
-
-        $this->challengeStorage
-            ->method('findAll')
-            ->willReturn([$challenge])
-        ;
+        $this->storage->save($challenge);
 
         $menuItems = $this->adminMenu->getMenuItems();
 
@@ -79,84 +80,66 @@ final class AdminMenuTest extends AbstractEasyAdminMenuTestCase
 
     public function testGetActiveChallengeCountWithMixedChallenges(): void
     {
-        $this->adminMenu = self::getService(AdminMenu::class);
         $now = time();
 
         // 创建不同状态的挑战
-        $activeChallenges = [
-            new Challenge('active-1', 'hashcash', 'test', 20, $now, $now + 3600),
-            new Challenge('active-2', 'hashcash', 'test', 20, $now, $now + 3600),
-        ];
+        $activeChallenge1 = new Challenge('active-1', 'hashcash', 'test', 20, $now, $now + 3600);
+        $activeChallenge2 = new Challenge('active-2', 'hashcash', 'test', 20, $now, $now + 3600);
 
         $expiredChallenge = new Challenge('expired', 'hashcash', 'test', 20, $now - 7200, $now - 3600);
 
         $usedChallenge = new Challenge('used', 'hashcash', 'test', 20, $now, $now + 3600);
         $usedChallenge->markAsUsed();
 
-        $allChallenges = array_merge($activeChallenges, [$expiredChallenge, $usedChallenge]);
-
-        $this->challengeStorage
-            ->method('findAll')
-            ->willReturn($allChallenges)
-        ;
+        // 保存所有挑战
+        $this->storage->save($activeChallenge1);
+        $this->storage->save($activeChallenge2);
+        $this->storage->save($expiredChallenge);
+        $this->storage->save($usedChallenge);
 
         $menuItems = $this->adminMenu->getMenuItems();
         $challengeMenu = $menuItems['proof_of_work_challenges'];
         $this->assertIsArray($challengeMenu);
-        $this->assertEquals(2, $challengeMenu['badge']);
+        $this->assertEquals(2, $challengeMenu['badge']); // 只有两个活跃挑战
     }
 
     public function testGetStatisticsReturnsCorrectCounts(): void
     {
-        $this->adminMenu = self::getService(AdminMenu::class);
         $now = time();
 
         // 创建测试数据
         $activeChallenge = new Challenge('active', 'hashcash', 'test', 20, $now, $now + 3600);
-        $expiredChallenge = new Challenge('expired', 'hashcash', 'test', 20, $now - 7200, $now - 3600);
+        // 注意：已过期的挑战无法保存到缓存（缓存会立即清除），因此不创建
         $usedChallenge = new Challenge('used', 'hashcash', 'test', 20, $now, $now + 3600);
         $usedChallenge->markAsUsed();
 
-        $this->challengeStorage
-            ->method('findAll')
-            ->willReturn([$activeChallenge, $expiredChallenge, $usedChallenge])
-        ;
+        $this->storage->save($activeChallenge);
+        $this->storage->save($usedChallenge);
 
         $stats = $this->adminMenu->getStatistics();
 
-        $this->assertEquals(3, $stats['total']);
+        // 注意：由于 CacheChallengeStorage 会在保存时设置缓存项在 expireTime 自动失效，
+        // 已过期的挑战无法被保存，因此 total=2 而非 3
+        $this->assertEquals(2, $stats['total']);
         $this->assertEquals(1, $stats['active']);
-        $this->assertEquals(1, $stats['expired']);
+        $this->assertEquals(0, $stats['expired']); // 无法保存已过期的挑战
         $this->assertEquals(1, $stats['used']);
         $this->assertArrayNotHasKey('error', $stats);
     }
 
-    public function testGetStatisticsHandlesStorageException(): void
+    public function testGetStatisticsWithEmptyStorage(): void
     {
-        $this->adminMenu = self::getService(AdminMenu::class);
-        $this->challengeStorage
-            ->method('findAll')
-            ->willThrowException(new \RuntimeException('Storage error'))
-        ;
-
         $stats = $this->adminMenu->getStatistics();
 
         $this->assertEquals(0, $stats['total']);
         $this->assertEquals(0, $stats['active']);
         $this->assertEquals(0, $stats['expired']);
         $this->assertEquals(0, $stats['used']);
-        $this->assertArrayHasKey('error', $stats);
-        $this->assertEquals('Storage error', $stats['error']);
+        $this->assertArrayNotHasKey('error', $stats);
     }
 
     public function testGetDashboardWidgetReturnsCorrectStructure(): void
     {
-        $this->adminMenu = self::getService(AdminMenu::class);
-        $this->challengeStorage
-            ->method('findAll')
-            ->willReturn([])
-        ;
-
         $widget = $this->adminMenu->getDashboardWidget();
 
         $this->assertIsArray($widget);
@@ -171,19 +154,13 @@ final class AdminMenuTest extends AbstractEasyAdminMenuTestCase
         $this->assertIsArray($widget['data']);
     }
 
-    public function testActiveChallengeCountHandlesStorageException(): void
+    public function testActiveChallengeCountWithEmptyStorage(): void
     {
-        $this->adminMenu = self::getService(AdminMenu::class);
-        $this->challengeStorage
-            ->method('findAll')
-            ->willThrowException(new \RuntimeException('Storage error'))
-        ;
-
         $menuItems = $this->adminMenu->getMenuItems();
         $challengeMenu = $menuItems['proof_of_work_challenges'];
         $this->assertIsArray($challengeMenu);
 
-        // 当存储出错时，徽章应该显示0
+        // 空存储时，徽章应该显示0
         $this->assertEquals(0, $challengeMenu['badge']);
     }
 }

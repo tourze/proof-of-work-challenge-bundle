@@ -7,7 +7,7 @@ namespace Tourze\ProofOfWorkChallengeBundle\Storage;
 use Psr\Cache\CacheItemPoolInterface;
 use Tourze\ProofOfWorkChallengeBundle\Entity\Challenge;
 
-class CacheChallengeStorage implements ChallengeStorageInterface
+final class CacheChallengeStorage implements ChallengeStorageInterface
 {
     private CacheItemPoolInterface $cache;
 
@@ -26,7 +26,9 @@ class CacheChallengeStorage implements ChallengeStorageInterface
     {
         $item = $this->cache->getItem($this->prefix . $challenge->getId());
         $item->set($challenge->toArray());
-        $item->expiresAt(new \DateTime('@' . $challenge->getExpireTime()));
+        // 添加 60 秒宽限期，让 VerifyChallengeHandler 能够检测到过期挑战并返回 CHALLENGE_EXPIRED
+        // 而不是直接返回 CHALLENGE_NOT_FOUND
+        $item->expiresAt(new \DateTime('@' . ($challenge->getExpireTime() + 60)));
         $this->cache->save($item);
 
         // 更新索引
@@ -115,7 +117,8 @@ class CacheChallengeStorage implements ChallengeStorageInterface
         $cutoff = time() - $seconds;
         $count = 0;
 
-        foreach ($history as $timestamp => $challengeId) {
+        // 数据结构：[challengeId => timestamp]
+        foreach ($history as $challengeId => $timestamp) {
             if ($timestamp >= $cutoff) {
                 ++$count;
             }
@@ -225,10 +228,11 @@ class CacheChallengeStorage implements ChallengeStorageInterface
             $history = [];
         }
 
-        $history[time()] = $challengeId;
+        // 使用 challengeId 作为键，time() 作为值，避免同一秒内多次调用导致键冲突
+        $history[$challengeId] = time();
 
         $cutoff = time() - 86400;
-        $history = array_filter($history, fn ($timestamp) => $timestamp >= $cutoff, ARRAY_FILTER_USE_KEY);
+        $history = array_filter($history, fn ($timestamp) => $timestamp >= $cutoff);
 
         $item->set($history);
         $item->expiresAfter(86400);

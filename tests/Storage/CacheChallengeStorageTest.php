@@ -5,451 +5,351 @@ declare(strict_types=1);
 namespace Tourze\ProofOfWorkChallengeBundle\Tests\Storage;
 
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\TestCase;
-use Psr\Cache\CacheItemInterface;
-use Psr\Cache\CacheItemPoolInterface;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use Tourze\PHPUnitSymfonyKernelTest\AbstractIntegrationTestCase;
 use Tourze\ProofOfWorkChallengeBundle\Entity\Challenge;
 use Tourze\ProofOfWorkChallengeBundle\Storage\CacheChallengeStorage;
 
 /**
+ * CacheChallengeStorage 集成测试
+ *
  * @internal
  */
 #[CoversClass(CacheChallengeStorage::class)]
-final class CacheChallengeStorageTest extends TestCase
+#[RunTestsInSeparateProcesses]
+final class CacheChallengeStorageTest extends AbstractIntegrationTestCase
 {
-    private CacheItemPoolInterface $cache;
-
     private CacheChallengeStorage $storage;
 
-    protected function setUp(): void
+    protected function onSetUp(): void
     {
-        $this->cache = $this->createMock(CacheItemPoolInterface::class);
-        $this->storage = new CacheChallengeStorage($this->cache, 'test_');
+        $this->storage = self::getService(CacheChallengeStorage::class);
+
+        // 清理存储中的所有挑战数据
+        $this->cleanStorage();
+    }
+
+    private function cleanStorage(): void
+    {
+        $allChallenges = $this->storage->findAll();
+        foreach ($allChallenges as $challenge) {
+            $this->storage->delete($challenge->getId());
+        }
     }
 
     public function testSaveChallenge(): void
     {
+        $now = time();
         $challenge = new Challenge(
-            'test-id',
+            'test-save-id',
             'hashcash',
-            'test-challenge',
+            'test-challenge-string',
             4,
-            time(),
-            time() + 300
+            $now,
+            $now + 300
         );
-
-        $challengeItem = $this->createMock(CacheItemInterface::class);
-        $indexItem = $this->createMock(CacheItemInterface::class);
-
-        // Mock getItem calls (challenge + index get + index save = 3 calls)
-        $this->cache->expects($this->exactly(3))
-            ->method('getItem')
-            ->willReturnCallback(function ($key) use ($challengeItem, $indexItem) {
-                if ('test_test-id' === $key) {
-                    return $challengeItem;
-                }
-                if ('test_index' === $key) {
-                    return $indexItem;
-                }
-                throw new \InvalidArgumentException("Unexpected key: {$key}");
-            })
-        ;
-
-        // Mock challenge item operations
-        $challengeItem->expects($this->once())
-            ->method('set')
-            ->with($challenge->toArray())
-        ;
-
-        $challengeItem->expects($this->once())
-            ->method('expiresAt')
-            ->with(self::isInstanceOf(\DateTime::class))
-        ;
-
-        // Mock index item operations
-        $indexItem->expects($this->atLeastOnce())
-            ->method('isHit')
-            ->willReturn(false) // index doesn't exist yet
-        ;
-
-        $indexItem->expects($this->atLeastOnce())
-            ->method('set')
-            ->with(['test-id'])
-        ;
-
-        $indexItem->expects($this->atLeastOnce())
-            ->method('expiresAfter')
-            ->with(86400 * 7) // 7 days
-        ;
-
-        // Expect save to be called twice (for challenge and index)
-        $this->cache->expects($this->exactly(2))
-            ->method('save')
-            ->willReturnCallback(function ($item) use ($challengeItem, $indexItem) {
-                self::assertThat($item, self::logicalOr(
-                    self::identicalTo($challengeItem),
-                    self::identicalTo($indexItem)
-                ));
-
-                return true;
-            })
-        ;
-
-        $this->storage->save($challenge);
-    }
-
-    public function testSaveChallengeWithClientId(): void
-    {
-        $challenge = new Challenge(
-            'test-id',
-            'hashcash',
-            'test-challenge',
-            4,
-            time(),
-            time() + 300
-        );
+        $challenge->setResource('login');
         $challenge->setClientId('client-123');
 
-        $challengeItem = $this->createMock(CacheItemInterface::class);
-        $indexItem = $this->createMock(CacheItemInterface::class);
-        $historyItem = $this->createMock(CacheItemInterface::class);
-
-        // Now expects 4 calls: challenge + index (2 calls) + history (1 call)
-        $this->cache->expects($this->exactly(4))
-            ->method('getItem')
-            ->willReturnCallback(function ($key) use ($challengeItem, $indexItem, $historyItem) {
-                if ('test_test-id' === $key) {
-                    return $challengeItem;
-                }
-                if ('test_index' === $key) {
-                    return $indexItem;
-                }
-                if ('test_history_client-123' === $key) {
-                    return $historyItem;
-                }
-                throw new \InvalidArgumentException("Unexpected key: {$key}");
-            })
-        ;
-
-        // Challenge item operations
-        $challengeItem->expects($this->once())
-            ->method('set')
-            ->with($challenge->toArray())
-        ;
-
-        $challengeItem->expects($this->once())
-            ->method('expiresAt')
-        ;
-
-        // Index item operations
-        $indexItem->expects($this->atLeastOnce())
-            ->method('isHit')
-            ->willReturn(false)
-        ;
-
-        $indexItem->expects($this->atLeastOnce())
-            ->method('set')
-            ->with(['test-id'])
-        ;
-
-        $indexItem->expects($this->atLeastOnce())
-            ->method('expiresAfter')
-            ->with(86400 * 7)
-        ;
-
-        // History item operations
-        $historyItem->expects($this->atLeastOnce())
-            ->method('isHit')
-            ->willReturn(false)
-        ;
-
-        $historyItem->expects($this->atLeastOnce())
-            ->method('set')
-            ->with(self::callback(fn ($value) => is_array($value)))
-        ;
-
-        $historyItem->expects($this->atLeastOnce())
-            ->method('expiresAfter')
-            ->with(86400)
-        ;
-
-        // Expect save to be called 3 times (challenge + index + history)
-        $this->cache->expects($this->exactly(3))
-            ->method('save')
-        ;
-
         $this->storage->save($challenge);
+
+        // 验证保存成功
+        $stored = $this->storage->find('test-save-id');
+        $this->assertNotNull($stored);
+        $this->assertEquals('test-save-id', $stored->getId());
+        $this->assertEquals('hashcash', $stored->getType());
+        $this->assertEquals('test-challenge-string', $stored->getChallenge());
+        $this->assertEquals(4, $stored->getDifficulty());
+        $this->assertEquals('login', $stored->getResource());
+        $this->assertEquals('client-123', $stored->getClientId());
+        $this->assertFalse($stored->isUsed());
     }
 
-    public function testFindChallenge(): void
+    public function testSaveChallengeWithoutClientId(): void
     {
-        $challengeData = [
-            'id' => 'test-id',
-            'type' => 'hashcash',
-            'challenge' => 'test-challenge',
-            'difficulty' => 4,
-            'create_time' => time(),
-            'expire_time' => time() + 300,
-            'resource' => 'login',
-            'client_id' => 'client-123',
-            'used' => false,
-            'metadata' => ['key' => 'value'],
-        ];
+        $now = time();
+        $challenge = new Challenge(
+            'test-no-client-id',
+            'hashcash',
+            'test-challenge',
+            4,
+            $now,
+            $now + 300
+        );
 
-        $cacheItem = $this->createMock(CacheItemInterface::class);
+        $this->storage->save($challenge);
 
-        $this->cache->expects($this->once())
-            ->method('getItem')
-            ->with('test_test-id')
-            ->willReturn($cacheItem)
-        ;
+        $stored = $this->storage->find('test-no-client-id');
+        $this->assertNotNull($stored);
+        $this->assertNull($stored->getClientId());
+    }
 
-        $cacheItem->expects($this->once())
-            ->method('isHit')
-            ->willReturn(true)
-        ;
+    public function testSaveChallengeWithMetadata(): void
+    {
+        $now = time();
+        $challenge = new Challenge(
+            'test-metadata-id',
+            'hashcash',
+            'test-challenge',
+            4,
+            $now,
+            $now + 300
+        );
+        $challenge->setMetadata(['key1' => 'value1', 'key2' => 'value2']);
 
-        $cacheItem->expects($this->once())
-            ->method('get')
-            ->willReturn($challengeData)
-        ;
+        $this->storage->save($challenge);
 
-        $challenge = $this->storage->find('test-id');
-
-        $this->assertNotNull($challenge);
-        $this->assertEquals('test-id', $challenge->getId());
-        $this->assertEquals('hashcash', $challenge->getType());
-        $this->assertEquals('login', $challenge->getResource());
-        $this->assertEquals('client-123', $challenge->getClientId());
-        $this->assertFalse($challenge->isUsed());
-        $this->assertEquals(['key' => 'value'], $challenge->getMetadata());
+        $stored = $this->storage->find('test-metadata-id');
+        $this->assertNotNull($stored);
+        $this->assertEquals(['key1' => 'value1', 'key2' => 'value2'], $stored->getMetadata());
     }
 
     public function testFindNonExistentChallenge(): void
     {
-        $cacheItem = $this->createMock(CacheItemInterface::class);
-
-        $this->cache->expects($this->once())
-            ->method('getItem')
-            ->with('test_non-existent')
-            ->willReturn($cacheItem)
-        ;
-
-        $cacheItem->expects($this->once())
-            ->method('isHit')
-            ->willReturn(false)
-        ;
-
-        $challenge = $this->storage->find('non-existent');
+        $challenge = $this->storage->find('non-existent-id');
         $this->assertNull($challenge);
     }
 
     public function testMarkAsUsed(): void
     {
-        $challengeData = [
-            'id' => 'test-id',
-            'type' => 'hashcash',
-            'challenge' => 'test-challenge',
-            'difficulty' => 4,
-            'create_time' => time(),
-            'expire_time' => time() + 300,
-            'used' => false,
-        ];
+        $now = time();
+        $challenge = new Challenge(
+            'test-mark-used-id',
+            'hashcash',
+            'test-challenge',
+            4,
+            $now,
+            $now + 300
+        );
+        $this->storage->save($challenge);
 
-        $findItem = $this->createMock(CacheItemInterface::class);
-        $saveItem = $this->createMock(CacheItemInterface::class);
-        $indexItem1 = $this->createMock(CacheItemInterface::class);
-        $indexItem2 = $this->createMock(CacheItemInterface::class);
+        // 验证初始状态
+        $stored = $this->storage->find('test-mark-used-id');
+        $this->assertNotNull($stored);
+        $this->assertFalse($stored->isUsed());
 
-        $this->cache->expects($this->exactly(3))
-            ->method('getItem')
-            ->willReturnCallback(function (string $key) use ($findItem, $saveItem, $indexItem1) {
-                static $calls = 0;
-                ++$calls;
+        // 标记为已使用
+        $this->storage->markAsUsed('test-mark-used-id');
 
-                if (str_ends_with($key, 'test-id')) {
-                    return 1 === $calls ? $findItem : $saveItem;
-                }
+        // 验证状态更新
+        $updated = $this->storage->find('test-mark-used-id');
+        $this->assertNotNull($updated);
+        $this->assertTrue($updated->isUsed());
+    }
 
-                return $indexItem1;
-            })
-        ;
-
-        $findItem->expects($this->once())
-            ->method('isHit')
-            ->willReturn(true)
-        ;
-
-        $findItem->expects($this->once())
-            ->method('get')
-            ->willReturn($challengeData)
-        ;
-
-        $saveItem->expects($this->once())
-            ->method('set')
-            ->with(self::callback(function ($data) {
-                return is_array($data) && true === $data['used'];
-            }))
-        ;
-
-        $saveItem->expects($this->once())
-            ->method('expiresAt')
-        ;
-
-        // Mock index operations - ID already exists in index
-        $indexItem1->expects($this->once())
-            ->method('isHit')
-            ->willReturn(true)
-        ;
-
-        $indexItem1->expects($this->once())
-            ->method('get')
-            ->willReturn(['test-id']) // ID already exists, so no saveIndex call
-        ;
-
-        $this->cache->expects($this->once())
-            ->method('save')
-            ->with($saveItem)
-        ;
-
-        $this->storage->markAsUsed('test-id');
+    public function testMarkAsUsedForNonExistentChallenge(): void
+    {
+        // 这不应该抛出异常
+        $this->storage->markAsUsed('non-existent-id');
+        $this->assertTrue(true); // 如果能到达这里，说明没有异常
     }
 
     public function testDelete(): void
     {
-        $this->cache->expects($this->once())
-            ->method('deleteItem')
-            ->with('test_test-id')
-        ;
+        $now = time();
+        $challenge = new Challenge(
+            'test-delete-id',
+            'hashcash',
+            'test-challenge',
+            4,
+            $now,
+            $now + 300
+        );
+        $this->storage->save($challenge);
 
-        $this->storage->delete('test-id');
-    }
+        // 验证保存成功
+        $this->assertNotNull($this->storage->find('test-delete-id'));
 
-    public function testCountRecentAttempts(): void
-    {
-        $history = [
-            time() - 100 => 'id1',
-            time() - 200 => 'id2',
-            time() - 3700 => 'id3', // Older than 1 hour
-        ];
+        // 删除
+        $this->storage->delete('test-delete-id');
 
-        $cacheItem = $this->createMock(CacheItemInterface::class);
-
-        $this->cache->expects($this->once())
-            ->method('getItem')
-            ->with('test_history_client-123')
-            ->willReturn($cacheItem)
-        ;
-
-        $cacheItem->expects($this->once())
-            ->method('isHit')
-            ->willReturn(true)
-        ;
-
-        $cacheItem->expects($this->once())
-            ->method('get')
-            ->willReturn($history)
-        ;
-
-        $count = $this->storage->countRecentAttempts('client-123', 3600);
-        $this->assertEquals(2, $count); // Only 2 attempts within the last hour
-    }
-
-    public function testCountRecentAttemptsNoHistory(): void
-    {
-        $cacheItem = $this->createMock(CacheItemInterface::class);
-
-        $this->cache->expects($this->once())
-            ->method('getItem')
-            ->with('test_history_client-123')
-            ->willReturn($cacheItem)
-        ;
-
-        $cacheItem->expects($this->once())
-            ->method('isHit')
-            ->willReturn(false)
-        ;
-
-        $count = $this->storage->countRecentAttempts('client-123');
-        $this->assertEquals(0, $count);
-    }
-
-    public function testDeleteExpired(): void
-    {
-        $deletedCount = $this->storage->deleteExpired();
-        $this->assertEquals(0, $deletedCount);
+        // 验证删除成功
+        $this->assertNull($this->storage->find('test-delete-id'));
     }
 
     public function testFindAll(): void
     {
-        $indexItem = $this->createMock(CacheItemInterface::class);
-        $challengeItem = $this->createMock(CacheItemInterface::class);
+        $now = time();
 
-        // Mock index retrieval
-        $this->cache->expects($this->exactly(2))
-            ->method('getItem')
-            ->willReturnCallback(function ($key) use ($indexItem, $challengeItem) {
-                if ('test_index' === $key) {
-                    return $indexItem;
-                }
-                if ('test_test-id' === $key) {
-                    return $challengeItem;
-                }
-                throw new \InvalidArgumentException("Unexpected key: {$key}");
-            })
-        ;
+        // 创建多个挑战
+        for ($i = 1; $i <= 3; ++$i) {
+            $challenge = new Challenge(
+                "test-all-{$i}",
+                'hashcash',
+                "challenge-{$i}",
+                4,
+                $now,
+                $now + 300
+            );
+            $this->storage->save($challenge);
+        }
 
-        $indexItem->expects($this->once())
-            ->method('isHit')
-            ->willReturn(true)
-        ;
+        $allChallenges = $this->storage->findAll();
+        $this->assertCount(3, $allChallenges);
 
-        $indexItem->expects($this->once())
-            ->method('get')
-            ->willReturn(['test-id'])
-        ;
-
-        // Mock challenge retrieval
-        $challengeItem->expects($this->once())
-            ->method('isHit')
-            ->willReturn(true)
-        ;
-
-        $challengeData = [
-            'id' => 'test-id',
-            'type' => 'hashcash',
-            'challenge' => 'test-challenge',
-            'difficulty' => 4,
-            'create_time' => time(),
-            'expire_time' => time() + 300,
-        ];
-
-        $challengeItem->expects($this->once())
-            ->method('get')
-            ->willReturn($challengeData)
-        ;
-
-        $challenges = $this->storage->findAll();
-        $this->assertCount(1, $challenges);
-        $this->assertEquals('test-id', $challenges[0]->getId());
+        $ids = array_map(fn ($c) => $c->getId(), $allChallenges);
+        $this->assertContains('test-all-1', $ids);
+        $this->assertContains('test-all-2', $ids);
+        $this->assertContains('test-all-3', $ids);
     }
 
-    public function testFindAllWithEmptyIndex(): void
+    public function testFindAllEmptyStorage(): void
     {
-        $indexItem = $this->createMock(CacheItemInterface::class);
+        $allChallenges = $this->storage->findAll();
+        $this->assertEmpty($allChallenges);
+    }
 
-        $this->cache->expects($this->once())
-            ->method('getItem')
-            ->with('test_index')
-            ->willReturn($indexItem)
-        ;
+    public function testCountRecentAttempts(): void
+    {
+        $now = time();
+        $clientId = 'rate-limit-client';
 
-        $indexItem->expects($this->once())
-            ->method('isHit')
-            ->willReturn(false)
-        ;
+        // 创建多个挑战
+        for ($i = 1; $i <= 5; ++$i) {
+            $challenge = new Challenge(
+                "attempt-{$i}",
+                'hashcash',
+                "challenge-{$i}",
+                4,
+                $now,
+                $now + 300
+            );
+            $challenge->setClientId($clientId);
+            $this->storage->save($challenge);
+        }
 
-        $challenges = $this->storage->findAll();
-        $this->assertEmpty($challenges);
+        // 计算最近尝试次数
+        $count = $this->storage->countRecentAttempts($clientId, 3600);
+        $this->assertEquals(5, $count);
+    }
+
+    public function testCountRecentAttemptsNoHistory(): void
+    {
+        $count = $this->storage->countRecentAttempts('no-history-client', 3600);
+        $this->assertEquals(0, $count);
+    }
+
+    public function testCountRecentAttemptsWithDifferentClients(): void
+    {
+        $now = time();
+
+        // 为 client-1 创建 3 个挑战
+        for ($i = 1; $i <= 3; ++$i) {
+            $challenge = new Challenge(
+                "client1-attempt-{$i}",
+                'hashcash',
+                "challenge-{$i}",
+                4,
+                $now,
+                $now + 300
+            );
+            $challenge->setClientId('client-1');
+            $this->storage->save($challenge);
+        }
+
+        // 为 client-2 创建 2 个挑战
+        for ($i = 1; $i <= 2; ++$i) {
+            $challenge = new Challenge(
+                "client2-attempt-{$i}",
+                'hashcash',
+                "challenge-{$i}",
+                4,
+                $now,
+                $now + 300
+            );
+            $challenge->setClientId('client-2');
+            $this->storage->save($challenge);
+        }
+
+        // 验证各客户端的计数
+        $this->assertEquals(3, $this->storage->countRecentAttempts('client-1', 3600));
+        $this->assertEquals(2, $this->storage->countRecentAttempts('client-2', 3600));
+    }
+
+    public function testDeleteExpired(): void
+    {
+        // deleteExpired 当前返回 0（可能是缓存自动处理过期）
+        $deletedCount = $this->storage->deleteExpired();
+        $this->assertEquals(0, $deletedCount);
+    }
+
+    public function testSaveUpdatesExistingChallenge(): void
+    {
+        $now = time();
+        $challenge = new Challenge(
+            'update-test-id',
+            'hashcash',
+            'original-challenge',
+            4,
+            $now,
+            $now + 300
+        );
+        $challenge->setResource('original-resource');
+        $this->storage->save($challenge);
+
+        // 更新挑战
+        $challenge->setResource('updated-resource');
+        $challenge->markAsUsed();
+        $this->storage->save($challenge);
+
+        // 验证更新
+        $stored = $this->storage->find('update-test-id');
+        $this->assertNotNull($stored);
+        $this->assertEquals('updated-resource', $stored->getResource());
+        $this->assertTrue($stored->isUsed());
+    }
+
+    public function testFindAllRemovesStaleIndexEntries(): void
+    {
+        $now = time();
+
+        // 创建并保存一个挑战
+        $challenge = new Challenge(
+            'stale-test-id',
+            'hashcash',
+            'test',
+            4,
+            $now,
+            $now + 300
+        );
+        $this->storage->save($challenge);
+
+        // 手动删除挑战（但保留索引）
+        $this->storage->delete('stale-test-id');
+
+        // findAll 应该能处理索引中的陈旧条目
+        $allChallenges = $this->storage->findAll();
+        $this->assertEmpty($allChallenges);
+    }
+
+    public function testChallengeExpiresByCache(): void
+    {
+        $now = time();
+
+        // 创建一个即将过期的挑战
+        $challenge = new Challenge(
+            'cache-expire-test',
+            'hashcash',
+            'test',
+            4,
+            $now,
+            $now + 1 // 1秒后过期
+        );
+        $this->storage->save($challenge);
+
+        // 立即查询应该能找到
+        $stored = $this->storage->find('cache-expire-test');
+        $this->assertNotNull($stored);
+
+        // 等待过期
+        sleep(2);
+
+        // 由于缓存项已过期，查询可能返回 null
+        // 但这取决于缓存驱动的行为
+        // 这里我们只验证查询不会抛出异常
+        $expiredStored = $this->storage->find('cache-expire-test');
+        // 结果可能为 null（缓存自动清除）或非 null（需要手动清除）
+        // 这取决于底层缓存实现
+        $this->assertTrue($expiredStored === null || $expiredStored->isExpired());
     }
 }

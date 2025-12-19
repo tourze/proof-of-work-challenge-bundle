@@ -9,7 +9,7 @@ use Symfony\Component\HttpKernel\Bundle\Bundle;
 use Tourze\BundleDependency\BundleDependencyInterface;
 use Tourze\EasyAdminMenuBundle\EasyAdminMenuBundle;
 
-class ProofOfWorkChallengeBundle extends Bundle implements BundleDependencyInterface
+final class ProofOfWorkChallengeBundle extends Bundle implements BundleDependencyInterface
 {
     public static function getBundleDependencies(): array
     {

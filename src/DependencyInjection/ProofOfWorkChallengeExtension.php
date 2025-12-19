@@ -6,7 +6,7 @@ namespace Tourze\ProofOfWorkChallengeBundle\DependencyInjection;
 
 use Tourze\SymfonyDependencyServiceLoader\AutoExtension;
 
-class ProofOfWorkChallengeExtension extends AutoExtension
+final class ProofOfWorkChallengeExtension extends AutoExtension
 {
     protected function getConfigDir(): string
     {

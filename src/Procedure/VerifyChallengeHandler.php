@@ -7,7 +7,7 @@ namespace Tourze\ProofOfWorkChallengeBundle\Procedure;
 use Tourze\ProofOfWorkChallengeBundle\Service\ProofVerifierInterface;
 use Tourze\ProofOfWorkChallengeBundle\Storage\ChallengeStorageInterface;
 
-class VerifyChallengeHandler
+final class VerifyChallengeHandler
 {
     private ProofVerifierInterface $verifier;
 

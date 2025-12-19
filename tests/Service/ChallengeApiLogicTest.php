@@ -10,7 +10,7 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Tourze\PHPUnitSymfonyWebTest\AbstractWebTestCase;
-use Tourze\ProofOfWorkChallengeBundle\Controller\Admin\ChallengeCrudController;
+use Tourze\ProofOfWorkChallengeBundle\Controller\Admin\ChallengeApiController;
 use Tourze\ProofOfWorkChallengeBundle\Entity\Challenge;
 use Tourze\ProofOfWorkChallengeBundle\Storage\CacheChallengeStorage;
 
@@ -18,7 +18,7 @@ use Tourze\ProofOfWorkChallengeBundle\Storage\CacheChallengeStorage;
  * Challenge API业务逻辑测试
  * @internal
  */
-#[CoversClass(ChallengeCrudController::class)]
+#[CoversClass(ChallengeApiController::class)]
 #[RunTestsInSeparateProcesses]
 final class ChallengeApiLogicTest extends AbstractWebTestCase
 {
@@ -32,28 +32,17 @@ final class ChallengeApiLogicTest extends AbstractWebTestCase
     }
 
     /**
-     * 清理所有测试相关的缓存数据
+     * 清理所有缓存数据
      */
     private function clearTestData(): void
     {
         $challengeStorage = self::getService(CacheChallengeStorage::class);
 
-        // 删除常见的测试ID
-        $testIds = [
-            'test-id-normal',
-            'test-id-used',
-            'test-id-expired',
-            'test-id-ttl',
-            'test-id-valid',
-        ];
-
-        // 删除包含test-id的所有挑战（通过findAll找到所有然后删除）
+        // 删除所有挑战数据
         try {
             $allChallenges = $challengeStorage->findAll();
             foreach ($allChallenges as $challenge) {
-                if (str_starts_with($challenge->getId(), 'test-id')) {
-                    $challengeStorage->delete($challenge->getId());
-                }
+                $challengeStorage->delete($challenge->getId());
             }
         } catch (\Exception $e) {
             // 忽略清理过程中的错误
@@ -80,7 +69,7 @@ final class ChallengeApiLogicTest extends AbstractWebTestCase
         $challengeStorage->save($challenge);
 
         // 通过容器获取控制器并直接调用
-        $controller = self::getService(ChallengeCrudController::class);
+        $controller = self::getService(ChallengeApiController::class);
         $request = new Request();
 
         $response = $controller->__invoke($request);
@@ -114,7 +103,7 @@ final class ChallengeApiLogicTest extends AbstractWebTestCase
         // 不创建任何挑战数据，存储为空
 
         // 通过容器获取控制器并直接调用
-        $controller = self::getService(ChallengeCrudController::class);
+        $controller = self::getService(ChallengeApiController::class);
         $request = new Request();
 
         $response = $controller->__invoke($request);
@@ -144,7 +133,7 @@ final class ChallengeApiLogicTest extends AbstractWebTestCase
         $challengeStorage->save($challenge);
 
         // 通过容器获取控制器并直接调用
-        $controller = self::getService(ChallengeCrudController::class);
+        $controller = self::getService(ChallengeApiController::class);
         $request = new Request();
 
         $response = $controller->__invoke($request);
@@ -177,7 +166,7 @@ final class ChallengeApiLogicTest extends AbstractWebTestCase
         $challengeStorage->save($challenge);
 
         // 通过容器获取控制器并直接调用
-        $controller = self::getService(ChallengeCrudController::class);
+        $controller = self::getService(ChallengeApiController::class);
         $request = new Request();
 
         $response = $controller->__invoke($request);
@@ -209,7 +198,7 @@ final class ChallengeApiLogicTest extends AbstractWebTestCase
         $challengeStorage->save($challenge);
 
         // 通过容器获取控制器并直接调用
-        $controller = self::getService(ChallengeCrudController::class);
+        $controller = self::getService(ChallengeApiController::class);
         $request = new Request();
 
         $response = $controller->__invoke($request);

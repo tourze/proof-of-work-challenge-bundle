@@ -6,7 +6,7 @@ namespace Tourze\ProofOfWorkChallengeBundle\Service;
 
 use Tourze\ProofOfWorkChallengeBundle\Entity\Challenge;
 
-class HashcashProofVerifier implements ProofVerifierInterface
+final class HashcashProofVerifier implements ProofVerifierInterface
 {
     public function verify(Challenge $challenge, string $proof): bool
     {

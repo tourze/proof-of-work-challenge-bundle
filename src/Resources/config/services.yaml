@@ -5,6 +5,16 @@ services:
     autoconfigure: true # Automatically registers your services as commands, event subscribers, etc.
     public: false
 
+  Tourze\ProofOfWorkChallengeBundle\Controller\:
+    resource: '../../Controller/'
+  Tourze\ProofOfWorkChallengeBundle\Service\:
+    resource: '../../Service/'
+  Tourze\ProofOfWorkChallengeBundle\Storage\:
+    resource: '../../Storage/'
+  Tourze\ProofOfWorkChallengeBundle\Procedure\:
+    resource: '../../Procedure/'
+    public: true
+
   # Storage Services
   Tourze\ProofOfWorkChallengeBundle\Storage\CacheChallengeStorage:
     arguments:
@@ -13,7 +23,7 @@ services:
 
   Tourze\ProofOfWorkChallengeBundle\Storage\ChallengeStorageInterface: '@Tourze\ProofOfWorkChallengeBundle\Storage\CacheChallengeStorage'
 
-  # Generator Services  
+  # Generator Services
   Tourze\ProofOfWorkChallengeBundle\Service\HashcashChallengeGenerator:
     arguments:
       $defaultTimeLimit: 300
@@ -21,8 +31,6 @@ services:
   Tourze\ProofOfWorkChallengeBundle\Service\ChallengeGeneratorInterface: '@Tourze\ProofOfWorkChallengeBundle\Service\HashcashChallengeGenerator'
 
   # Verifier Services
-  Tourze\ProofOfWorkChallengeBundle\Service\HashcashProofVerifier: ~
-
   Tourze\ProofOfWorkChallengeBundle\Service\ProofVerifierInterface: '@Tourze\ProofOfWorkChallengeBundle\Service\HashcashProofVerifier'
 
   # Adjuster Services
@@ -33,18 +41,3 @@ services:
       $maxDifficulty: 20
 
   Tourze\ProofOfWorkChallengeBundle\Service\DifficultyAdjusterInterface: '@Tourze\ProofOfWorkChallengeBundle\Service\AdaptiveDifficultyAdjuster'
-
-  # Procedure Handlers
-  Tourze\ProofOfWorkChallengeBundle\Procedure\IssueChallengeHandler: ~
-  Tourze\ProofOfWorkChallengeBundle\Procedure\VerifyChallengeHandler: ~
-
-  # Admin Services
-  Tourze\ProofOfWorkChallengeBundle\Service\AdminMenu:
-    public: true
-
-    
-  # Admin Controllers
-  Tourze\ProofOfWorkChallengeBundle\Controller\Admin\ChallengeCrudController:
-    arguments:
-      $challengeStorage: '@Tourze\ProofOfWorkChallengeBundle\Storage\CacheChallengeStorage'
-    tags: ['controller.service_arguments']

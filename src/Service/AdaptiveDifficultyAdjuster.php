@@ -6,7 +6,7 @@ namespace Tourze\ProofOfWorkChallengeBundle\Service;
 
 use Tourze\ProofOfWorkChallengeBundle\Storage\ChallengeStorageInterface;
 
-class AdaptiveDifficultyAdjuster implements DifficultyAdjusterInterface
+final class AdaptiveDifficultyAdjuster implements DifficultyAdjusterInterface
 {
     private ChallengeStorageInterface $storage;
 
